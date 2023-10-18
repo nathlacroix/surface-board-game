@@ -3,7 +3,7 @@ Description=Interactive PhD Hat Service
 
 [Service]
 # Command to execute when the service is started
-ExecStart=/home/hat/phdhatenv/bin/python /home/hat/surface-board-game/src/main.py
+ExecStart=/home/hat/phdhatenv/bin/python /home/hat/surface-board-game/src/surface_board_game/main.py
 Restart=on-failure
 
 [Install]

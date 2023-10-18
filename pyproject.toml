@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "surface-board-game"
+name = "surface_board_game"
 version = "0.0.1"
 description = "Surface code PhD hat game"
 readme = "README.md"
@@ -11,6 +11,7 @@ requires-python = ">=3.7"
 
 dependencies = [
     "Adafruit-Blinka",
+    "adafruit-circuitpython-neopixel",
     "adafruit-circuitpython-ssd1306",
     "numpy",
     "Pillow",
