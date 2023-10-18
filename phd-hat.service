@@ -1,0 +1,10 @@
+[Unit]
+Description=Interactive PhD Hat Service
+
+[Service]
+# Command to execute when the service is started
+ExecStart=/home/hat/phdhatenv/bin/python /home/hat/surface-board-game/src/main.py
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
