@@ -29,7 +29,7 @@ Clone this repository to `/home/hat`
 For testing
 
 ```
-sudo /home/hat/phdhatenv/bin/python /home/hat/surface-board-game/src/surface-board-game/main.py
+sudo /home/hat/phdhatenv/bin/python /home/hat/surface-board-game/src/surface_board_game/main.py
 ```
 
 As a systemd service
