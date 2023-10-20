@@ -1,10 +1,3 @@
-# SPDX-FileCopyrightText: 2017 James DeVito for Adafruit Industries
-# SPDX-License-Identifier: MIT
-
-# This example is for use on (Linux) computers that are using CPython with
-# Adafruit Blinka to support CircuitPython libraries. CircuitPython does
-# not support PIL/pillow (python imaging library)!
-
 import board
 import busio
 from digitalio import DigitalInOut, Direction, Pull
@@ -64,8 +57,7 @@ draw = ImageDraw.Draw(image)
 # Draw a black filled box to clear the image.
 draw.rectangle((0, 0, width, height), outline=0, fill=0)
 
-
-while True:
+def check_buttons():
     if button_U.value:  # button is released
         draw.polygon([(20, 20), (30, 2), (40, 20)], outline=255, fill=0)  # Up
     else:  # button is pressed:
@@ -77,6 +69,7 @@ while True:
     else:  # button is pressed:
         draw.polygon([(0, 30), (18, 21), (18, 41)], outline=255, fill=1)  # left filled
         print('Left')
+        return 'left'
 
     if button_R.value:  # button is released
         draw.polygon([(60, 30), (42, 21), (42, 41)], outline=255, fill=0)  # right
@@ -85,6 +78,7 @@ while True:
             [(60, 30), (42, 21), (42, 41)], outline=255, fill=1
         )  # right filled
         print('right')
+        return 'right'
 
     if button_D.value:  # button is released
         draw.polygon([(30, 60), (40, 42), (20, 42)], outline=255, fill=0)  # down
@@ -108,12 +102,3 @@ while True:
     else:  # button is pressed:
         draw.ellipse((100, 20, 120, 40), outline=255, fill=1)  # B button filled
         print('button B center')
-
-    if not button_A.value and not button_B.value and not button_C.value:
-        catImage = Image.open("happycat_oled_64.ppm").convert("1")
-        disp.image(catImage)
-    else:
-        # Display image.
-        disp.image(image)
-
-    disp.show()
