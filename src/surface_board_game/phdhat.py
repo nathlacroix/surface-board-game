@@ -189,6 +189,7 @@ class PhDHat:
         # Make sure to create image with mode '1' for 1-bit color.
         width = self.disp.width
         height = self.disp.height
+        print(text)
         if new_screen:
             self.image = Image.new("1", (width, height))
 
@@ -241,6 +242,8 @@ class PhDHat:
             # If A button pressed (value brought low)
             if not self.button_a.value:
                 return
+            elif self.check_bypasses():
+                return
             else:
                 time.sleep(FRAME_TIME)
 
@@ -264,16 +267,40 @@ class PhDHat:
         self._display_text_on_screen(
             "2. Tune the TWPA!", sleep=3,
         )
-        power = 11
-        frequency = 7.7
-        gain = self.twpa_optimization(power, frequency)
+        # Optional: light up LEDs of data qubits in a dim way on readout line
+        # with the twpa.
+        # ...
+
+        # twpa optimization
+        params = dict(power=8.5, freq=7.90) # t
+        # params = dict(power=8.0, freq=8.03) # init params for Ants
+        target_gain = 20
+        fact = 40/12.13
         success = False
         while not success:
-            text = f"Pump power (U/D): {power:.1f} dBm   Pump frequency (L/R): {frequency:.2f} GHz"
-            self._display_text_on_screen(text, anchor="lt", position=(2, 2), font_size=12)
-            gain = self.twpa_optimization(power, frequency)
-            success = self.check_bypasses()
 
+            text = (f"Pump power (U/D): {params['power']:.1f} dBm   "
+                    f"Pump frequency (L/R): {params['freq']:.2f} GHz")
+            gain, toomuchnoise = self.twpa_optimization(params['power'], params['freq'])
+            self._display_text_on_screen(text, anchor="lt", position=(2, 2), font_size=10)
+            # multiplicative factor such that 20 dB at "optimal" twpa parameters i.e. 9 dbm and 7.91 GHz
+            text = f"Gain: {gain * fact:.2f} dB"
+            self._display_text_on_screen(text, new_screen=False)
+            mapping = [
+                 (self.button_l, ('freq', -0.01), ),
+                 (self.button_r, ('freq', 0.01), ),
+                 (self.button_d, ('power', -0.1), ),
+                 (self.button_u, ('power', 0.1),)
+             ]
+            action = self.check_buttons(button_action_mapping=mapping, bypass_value=('power', 0.1))
+            if isinstance(action, tuple):
+                params[action[0]] += action[1]
+            if not toomuchnoise and np.abs(gain * fact - target_gain) < 0.5:
+                success = True
+
+            if toomuchnoise:
+                pass # optionally  implement crazy mode
+                #self._display_text_on_screen("Too much noise!", new_screen=False)
 
 
     def twpa_optimization(self, power, frequency):
@@ -298,7 +325,6 @@ class PhDHat:
         return gain, toomuchnoise
 
     def surface_code_stage(self):
-        print('Starting surface code game ...')
         self._display_text_on_screen(
             "Starting surface\nboard game..."
         )
@@ -308,19 +334,20 @@ class PhDHat:
         print('Loading samples...')
         # Assume your samples are loaded in the following format:
         # samples = {0: {'syndromes': [...], 'data_qubits': [...], 'log_op': ...}, 1: {...}, ...}
-        samples = self.load_samples("samples.npz")
+        samples = self.load_samples("src/surface_board_game/samples.npz")
         current_round = 1
-        self.score = 0
-        self.streak = 0
-        self.n_rounds = 3
+        self.score = 0 # amount of successes
+        self.streak = 0 # amount of consecutive successes
+        self.n_rounds = 3 # number of games of decoding to program
 
+        # light up data qubits
+        self.light_neopixels([True] * DISTANCE**2, colors=[COLOR_DATA_QB] * DISTANCE**2,
+                             indices=np.arange(DISTANCE**2) + N_AUX_QBS) # currently assumes data qubits are after aux.
         while playing:
-            print(f'Game #{current_round}')
             self._display_text_on_screen(f'Game #{current_round}', sleep=2)
-            sample = self.choose_sample(samples, current_round)
-            self.display_syndrome(sample, current_round)
-            # check logical operator
-            success = self.check_logical_operator(sample['log_op'])
+            sample = self.choose_sample(samples)
+            success = self.display_syndrome(sample)
+
             current_round += 1
             self.score += success
             if success:
@@ -333,10 +360,31 @@ class PhDHat:
             if current_round > self.n_rounds:
                 playing = False
 
+        if self.score/self.n_rounds > 0.5:
+            text = (f"Congratulations!\nYou are {self.score/self.n_rounds*100:.1f}% "
+                    f"successful at decoding!\nThis is "
+                    f"enough to correctly\nproject onto the Massachusetts\n State "
+                    f"without errors.")
+            self._display_text_on_screen(text, font_size=10)
+        else:
+            text = (f"You are {self.score / self.n_rounds*100:.1f}% "
+                   f"successful at decoding.\nMake sure to train again before "
+                   f"\nprojecting onto the Massachusetts\n State.")
+            self._display_text_on_screen(text, font_size=10)
         print('Game over.')
 
-    def check_logical_operator(self, log_op):
-        return True
+    def check_logical_operator(self, sample, flip):
+        print(sample)
+        log_op = sample['log_op']
+        initial_state = sample['log_op_init']
+        print(f'Checking logical operator: initial state {initial_state}, log op {log_op}, flip {flip}')
+        if flip:
+            log_op = not log_op
+        if log_op == initial_state:
+            return True
+        else:
+            return False
+
     @staticmethod
     def load_samples(file_path, display=False):
         data = np.load(file_path, allow_pickle=True)
@@ -351,7 +399,7 @@ class PhDHat:
         return samples
 
     @staticmethod
-    def choose_sample(samples, current_round):
+    def choose_sample(samples):
         global current_frame
 
         if current_frame < N_DETERMINISTIC_SAMPLES:
@@ -364,47 +412,65 @@ class PhDHat:
         current_frame += 1
         return samples[sample_index]
 
-    def display_syndrome(self, sample, current_round, colors=None, bypass_buttons=False):
+    def display_syndrome(self, sample, colors=None, bypass_buttons=False):
         if colors is None:
             colors = [COLOR_Z_AUX_QB] * 4 + [COLOR_X_AUX_QB] * 4
 
         cycle = 0
         exit = False
-        while cycle < len(sample['syndromes']) / N_AUX_QBS  and not exit:
-            syndrome_slice = sample['syndromes'][cycle*N_AUX_QBS: (cycle + 1) * N_AUX_QBS]
-            print("Cycle:", cycle +1, syndrome_slice) # for display, cycles are 1-indexed
-            self._display_surface_board_cycle(score=self.score, n_rounds=self.n_rounds,
-                                              streak=self.streak, cycle=cycle+1) # for display, cycles are 1-indexed
-            self.light_neopixels(syndrome_slice, colors)
-            self.pixels.show()
-            if bypass_buttons:
-                cycle += 1
-                time.sleep(2)
+        while cycle < len(sample['syndromes']) / N_AUX_QBS + 1  and not exit:
+            if cycle == len(sample['syndromes']) / N_AUX_QBS:
+                # this is the last frame, but it needs to still be in the while
+                # loop just in case the decision is taken to go back to the previous cycle
+                self.display_logical_operator_prompt()
+
+                action = self.check_buttons(button_action_mapping=[(self.button_l, 'prev'),
+                                                                   (self.button_u, 'yes'),
+                                                                   (self.button_d, 'no')],
+                                            bypass_value="yes")
+                if action == "prev": # go back to previous cycle
+                    cycle -= 1
+                elif action == "yes": # check logical operator and return success/failure
+                    return self.check_logical_operator(sample, flip=True)
+                elif action == "no":
+                    return self.check_logical_operator(sample, flip=False)
+
             else:
-                frame_update = None
-                while frame_update is None:
-                    frame_update = self.check_buttons()
-                    if frame_update == 'next':
-                        cycle += 1
-                    if frame_update == 'prev':
-                        if cycle > 0:
-                            cycle -= 1
-                    if frame_update == 'exit':
-                        exit = True
-                time.sleep(0.5)
+                syndrome_slice = sample['syndromes'][cycle*N_AUX_QBS: (cycle + 1) * N_AUX_QBS]
+                print("Cycle:", cycle +1, syndrome_slice) # for display, cycles are 1-indexed
+                self._display_surface_board_cycle(score=self.score, n_rounds=self.n_rounds,
+                                                  streak=self.streak, cycle=cycle+1) # for display, cycles are 1-indexed
+                self.light_neopixels(syndrome_slice, colors)
+
+                if bypass_buttons:
+                    cycle += 1
+                    time.sleep(2)
+                else:
+                    frame_update = None
+                    while frame_update is None:
+                        frame_update = self.check_buttons(bypass_value="next")
+                        if frame_update == 'next':
+                            cycle += 1
+                        if frame_update == 'prev':
+                            if cycle > 0:
+                                cycle -= 1
+                        if frame_update == 'exit':
+                            exit = True
+                    time.sleep(0.5)
 
         #
         # return False  # Unsuccessful display
-    def check_buttons(self):
-        if not self.button_r.value:
-            return 'next'
-        elif not self.button_l.value:
-            return 'prev'
-        elif self.check_bypasses():
-            return 'exit'
+    def check_buttons(self, button_action_mapping=None, bypass_value="exit"):
+        if button_action_mapping is None:
+            button_action_mapping = [(self.button_r, 'next'), (self.button_l, 'prev')]
+        for b, action in button_action_mapping:
+            if not b.value:
+                return action
+        if self.check_bypasses():
+            return bypass_value
 
     def check_bypasses(self, button_bypass=True, software_bypass=True):
-        if button_bypass not self.button_a.value and not self.button_b.value:
+        if button_bypass and not self.button_a.value and not self.button_b.value:
             return True
         elif software_bypass and self.software_bypass:
             print('software bypass will be activated in 2 sec!')
@@ -413,29 +479,37 @@ class PhDHat:
         else:
             return False
 
-    def light_neopixels(self, syndrome_slice, colors):
-        # Adjust this function based on your actual NeoPixel setup
-        for i in range(min(len(syndrome_slice), NEOPIXEL_COUNT)):
-            if syndrome_slice[i]:
-                self.pixels[i] = colors[i]  # Turn on NeoPixel
+    def light_neopixels(self, mask, colors, indices=None):
+        """
+
+        :param mask: list of booleans, if True, turn on pixel, if False, turn off
+        :param colors: colors for each pixel. must be same length as mask
+        :param indices: optional list of indices in the self.pixels list addressed by mask.
+        must be same length as mask and colors
+        :return:
+        """
+        if indices is None:
+            indices = np.arange(len(mask))
+        for i, m, c in zip(indices, mask, colors):
+            if m:
+                self.pixels[i] = c  # Turn on NeoPixel
             else:
                 self.pixels[i] = (0, 0, 0)  # Turn off NeoPixel
+        self.pixels.show()
 
-    def display_logical_operator_prompt(self):
-        print(
-            "Do you want to flip the logical operator? (Press 'left' to decline, 'right' to accept)")
+    def display_logical_operator_prompt(self, op="Z"):
+        txt = f"Flip {op}_L?\n(Up: 'Yes', Down: 'No')"
+        self._display_text_on_screen(txt, font_size=12)
 
 
 
     def display_success_screen(self, score, streak):
         text = f"Success!\n New Score: {score}, Streak: {streak}"
-        print(text)
         self._display_text_on_screen(text, font_size=12)
         time.sleep(2)
 
     def display_failure_screen(self, score):
         text = f"Incorrect :-(\nScore: {score}"
-        print(text)
         self._display_text_on_screen(text, font_size=12)
         time.sleep(2)
 
