@@ -117,6 +117,9 @@ current_frame = 0
 class PhDHat:
 
     def __init__(self):
+        # configure software bypass. Set to False to run in normal mode with the hat
+        self.software_bypass = True
+
         self.state = "pre-initialize"
         self.pixels = neopixel.NeoPixel(
             PI_PIN_NEOPIXELS,
@@ -176,8 +179,6 @@ class PhDHat:
         self.pixels.fill((0, 0, 0))
         self.pixels.show()
 
-        self.twpa_pump_power = 2.0
-        self.twpa_pump_frequency = 7.0
 
     def _display_text_on_screen(
         self, text: str, new_screen=True, font: ImageFont = None,
@@ -253,9 +254,7 @@ class PhDHat:
             if not self.airbridge_input.value:
                 return
             # bypass If A and B pressed (brought low)
-            elif not self.button_a.value and not self.button_b.value:
-                # wait a bit to avoid skipping other steps
-                time.sleep(FRAME_TIME*15)
+            elif self.check_bypasses():
                 return
             else:
                 time.sleep(FRAME_TIME)
@@ -263,9 +262,41 @@ class PhDHat:
     def twpa_stage(self):
         # Display message
         self._display_text_on_screen(
-            "2. Tune the TWPA!"
+            "2. Tune the TWPA!", sleep=3,
         )
-    
+        power = 11
+        frequency = 7.7
+        gain = self.twpa_optimization(power, frequency)
+        success = False
+        while not success:
+            text = f"Pump power (U/D): {power:.1f} dBm   Pump frequency (L/R): {frequency:.2f} GHz"
+            self._display_text_on_screen(text, anchor="lt", position=(2, 2), font_size=12)
+            gain = self.twpa_optimization(power, frequency)
+            success = self.check_bypasses()
+
+
+
+    def twpa_optimization(self, power, frequency):
+        # Input: Frequency in GHz, power in dBm
+        # Output: Gain Factor (between 0 and 10), bool for indicating too much noise
+        # Optimal value at 7.91 GHz, 9.5 dBm
+        # Too much noise above 9 dBm
+
+        freqgain = 10 / (1 + (7.91 - frequency) ** 2 / 0.01)
+
+        powergain = np.exp(-(power - 9.5) ** 2 / 0.5)
+
+        gain = freqgain * powergain
+
+        try:
+            if power > 9:
+                toomuchnoise = True
+            else:
+                toomuchnoise = False
+        except:
+            toomuchnoise = False
+        return gain, toomuchnoise
+
     def surface_code_stage(self):
         print('Starting surface code game ...')
         self._display_text_on_screen(
@@ -369,8 +400,19 @@ class PhDHat:
             return 'next'
         elif not self.button_l.value:
             return 'prev'
-        elif not self.button_a.value and not self.button_b.value:
+        elif self.check_bypasses():
             return 'exit'
+
+    def check_bypasses(self, button_bypass=True, software_bypass=True):
+        if button_bypass not self.button_a.value and not self.button_b.value:
+            return True
+        elif software_bypass and self.software_bypass:
+            print('software bypass will be activated in 2 sec!')
+            time.sleep(2)
+            return True
+        else:
+            return False
+
     def light_neopixels(self, syndrome_slice, colors):
         # Adjust this function based on your actual NeoPixel setup
         for i in range(min(len(syndrome_slice), NEOPIXEL_COUNT)):
