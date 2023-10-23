@@ -1,7 +1,5 @@
 import phdhat
 
-
-
 # Set up system
 hat = phdhat.PhDHat()
 
