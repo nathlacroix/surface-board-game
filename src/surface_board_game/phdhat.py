@@ -433,8 +433,10 @@ class PhDHat:
         while True:
             # If A button pressed (value brought low)
             if not self.button_a.value:
+                N_DETERMINISTIC_SAMPLES = 0
                 return True
             elif self.check_bypasses():
+                N_DETERMINISTIC_SAMPLES = 0
                 return True
             else:
                 time.sleep(FRAME_TIME)
