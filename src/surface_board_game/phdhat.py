@@ -13,7 +13,7 @@ from PIL import ImageFont, ImageDraw, Image
 
 PI_PIN_NEOPIXELS = board.D18
 PI_PIN_AIRBRIDGE = board.D25
-PI_NEOPIXEL_COUNT = 18
+PI_NEOPIXEL_COUNT = 21
 FONTPATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 # Tick rate for sleeping between checking the buttons, 60 Hz
 FRAME_TIME = 1.0/60.0
@@ -35,7 +35,6 @@ green_gradients = [
     (28, 227, 0),
     (32, 223, 0),
     (36, 219, 0),
-
     (44, 211, 0),
     (48, 207, 0),
     (52, 203, 0),
@@ -121,15 +120,15 @@ class PhDHat:
 
     def __init__(self):
         # configure software bypass. Set to False to run in normal mode with the hat
-        self.software_bypass = True
+        self.software_bypass = False
 
         self.state = "pre-initialize"
         self.pixels = neopixel.NeoPixel(
             PI_PIN_NEOPIXELS,
             PI_NEOPIXEL_COUNT,
             brightness=0.2,
-            auto_write=False,
-            pixel_order=neopixel.GRB
+            # auto_write=False,
+            pixel_order=neopixel.GRB,
         )
         # Create the I2C interface.
         self.i2c = busio.I2C(board.SCL, board.SDA)
@@ -180,7 +179,30 @@ class PhDHat:
 
         # Clear the neopixels
         self.pixels.fill((0, 0, 0))
-        self.pixels.show()
+        # self.pixels.show()
+
+        self.led_indices = {
+            "d1":  1,
+            "d2":  2,
+            "d3":  3,
+            "d4":  4,
+            "d5":  5,
+            "d6":  6,
+            "d7":  7,
+            "d8":  8,
+            "d9":  9,
+            "x1": 10,
+            "x2": 11,
+            "x3": 12,
+            "x4": 13,
+            "z1": 14,
+            "z2": 15,
+            "z3": 16,
+            "z4": 17,
+            "twpa1": 18,
+            "twpa2": 19,
+            "twpa3": 20,
+        }
 
 
     def _display_text_on_screen(
@@ -237,12 +259,45 @@ class PhDHat:
         self._display_text_on_screen(f'Cycle: {cycle}', new_screen=False)
         # time.sleep(2)
 
+    def _led_test(self):
+        self.pixels.fill((255, 0, 0))
+        # self.pixels.show()
+        time.sleep(2)
+        self.pixels.fill((0, 255, 0))
+        # self.pixels.show()
+        time.sleep(2)
+        self.pixels.fill((0, 0, 255))
+        # self.pixels.show()
+        time.sleep(2)
+        for led_key in self.led_indices:
+            if led_key[0] == 'd':
+                color = (255, 0, 0)
+            elif led_key[0] == 'x':
+                color = (0, 255, 0)
+            elif led_key[0] == 'z':
+                color = (0, 0, 255)
+            else:
+                color = (128, 128, 128)
+            self.pixels.fill((0, 0, 0))
+            # for pix_idx in range(len(self.pixels)):
+            #     self.pixels[pix_idx] = (0, 0, 0)
+            self.pixels[self.led_indices[led_key]] = color
+            # self.pixels.show()
+            # mask = PI_NEOPIXEL_COUNT * [False]
+            # colors = PI_NEOPIXEL_COUNT * [(0, 0, 0)]
+            # mask[self.led_indices[led_key]] = True
+            # colors[self.led_indices[led_key]] = color
+            # self.light_neopixels(mask, colors)
+            time.sleep(5)
+
     def initial_stage(self):
         print('Initial stage ...')
         # Display welcome text
         self._display_text_on_screen(
-            "Welcome\nto your PhD hat\nPress #5 to start"
+            "Welcome\nto your PhD hat\nPress #5 to start",
+            sleep=1,
         )
+        self._led_test()
         while True:
             # If A button pressed (value brought low)
             if not self.button_a.value:
@@ -278,7 +333,7 @@ class PhDHat:
         # ...
 
         # twpa optimization
-        params = dict(power=8.5, freq=7.90) # t
+        params = dict(power=8.5, freq=7.90)
         # params = dict(power=8.0, freq=8.03) # init params for Ants
         target_gain = 20
         fact = 40/12.13
@@ -357,8 +412,11 @@ class PhDHat:
         self.n_rounds = 3 # number of games of decoding to program
 
         # light up data qubits
-        self.light_neopixels([True] * DISTANCE**2, colors=[COLOR_DATA_QB] * DISTANCE**2,
-                             indices=np.arange(DISTANCE**2) + N_AUX_QBS) # currently assumes data qubits are after aux.
+        self.light_neopixels(
+            [True] * DISTANCE**2,
+            colors=[COLOR_DATA_QB] * DISTANCE**2,
+            indices=np.arange(DISTANCE**2) + N_AUX_QBS,  # currently assumes data qubits are after aux.
+        )
         while playing:
             self._display_text_on_screen(f'Game #{current_round}', sleep=2)
             sample = self.choose_sample(samples)
@@ -497,7 +555,6 @@ class PhDHat:
 
     def light_neopixels(self, mask, colors, indices=None):
         """
-
         :param mask: list of booleans, if True, turn on pixel, if False, turn off
         :param colors: colors for each pixel. must be same length as mask
         :param indices: optional list of indices in the self.pixels list addressed by mask.
