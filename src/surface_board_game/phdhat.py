@@ -445,8 +445,6 @@ class PhDHat:
         self._display_text_on_screen(
             "3. Win\nthe surface\nboard game"
         )
-        time.sleep(2)
-
         playing = True
         
         # Assume your samples are loaded in the following format:
@@ -461,12 +459,13 @@ class PhDHat:
 
         # light up data qubits
         self.pixels.fill((0, 0, 0))
-        colors = [COLOR_Z_AUX_QB] * 4 + [COLOR_X_AUX_QB] * 4 + [COLOR_DATA_QB] * 9
+        colors = [COLOR_DATA_QB] * 9 + [COLOR_Z_AUX_QB] * 4 + [COLOR_X_AUX_QB] * 4 
         keys = ["d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "z1", "z2", "z3", "z4", "x1", "x2", "x3", "x4"]
         self.light_neopixels(
             [True] * (DISTANCE**2 * 2 - 1), colors=colors,
             keys=keys,
         )
+        time.sleep(2)
         # self.light_neopixels([True] * DISTANCE**2, colors=[COLOR_DATA_QB] * DISTANCE**2,
         #                      keys=[f"d{i}" for i in range(1,  DISTANCE**2 +1) ]) # currently assumes data qubits are after aux.
         while playing:
