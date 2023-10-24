@@ -183,22 +183,22 @@ class PhDHat:
 
         self.led_indices = {
             "d1":  1,
-            "d2":  2,
-            "d3":  3,
-            "d4":  4,
-            "d5":  5,
-            "d6":  6,
-            "d7":  7,
-            "d8":  8,
-            "d9":  9,
-            "x1": 10,
-            "x2": 11,
-            "x3": 12,
-            "x4": 13,
-            "z1": 14,
-            "z2": 15,
-            "z3": 16,
-            "z4": 17,
+            "d2":  5,
+            "d3":  7,
+            "d4":  3,
+            "d5":  9,
+            "d6": 15,
+            "d7": 11,
+            "d8": 13,
+            "d9": 17,
+            "x1":  6,
+            "x2":  4,
+            "x3": 14,
+            "x4": 12,
+            "z1": 2,
+            "z2": 10,
+            "z3":  8,
+            "z4": 16,
             "twpa1": 18,
             "twpa2": 19,
             "twpa3": 20,
@@ -270,17 +270,21 @@ class PhDHat:
         # self.pixels.show()
         time.sleep(2)
         for led_key in self.led_indices:
+            self.pixels.fill((0, 0, 0))
             if led_key[0] == 'd':
+                # red
                 color = (255, 0, 0)
             elif led_key[0] == 'x':
-                color = (0, 255, 0)
-            elif led_key[0] == 'z':
+                # blue
                 color = (0, 0, 255)
+            elif led_key[0] == 'z':
+                # green
+                color = (0, 255, 0)
             else:
                 color = (128, 128, 128)
-            self.pixels.fill((0, 0, 0))
             # for pix_idx in range(len(self.pixels)):
             #     self.pixels[pix_idx] = (0, 0, 0)
+            print(f"LED {led_key}, index {self.led_indices[led_key]}")
             self.pixels[self.led_indices[led_key]] = color
             # self.pixels.show()
             # mask = PI_NEOPIXEL_COUNT * [False]
@@ -288,7 +292,7 @@ class PhDHat:
             # mask[self.led_indices[led_key]] = True
             # colors[self.led_indices[led_key]] = color
             # self.light_neopixels(mask, colors)
-            time.sleep(5)
+            time.sleep(3)
 
     def initial_stage(self):
         print('Initial stage ...')
@@ -333,8 +337,8 @@ class PhDHat:
         # ...
 
         # twpa optimization
-        params = dict(power=8.5, freq=7.90)
-        # params = dict(power=8.0, freq=8.03) # init params for Ants
+        # params = dict(power=8.5, freq=7.90)
+        params = dict(power=8.0, freq=8.03) # init params for Ants
         target_gain = 20
         fact = 40/12.13
         success = False
