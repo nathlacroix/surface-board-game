@@ -354,8 +354,8 @@ class PhDHat:
         # with the twpa.
 
         # twpa optimization
-        params = dict(power=8.5, freq=7.90)  # easy ones
-        # params = dict(power=8.0, freq=8.03)  # hard ones
+        # params = dict(power=8.5, freq=7.90)  # easy ones
+        params = dict(power=8.0, freq=8.03)  # hard ones
         target_gain = 20
         fact = 40/12.13
         success = False
