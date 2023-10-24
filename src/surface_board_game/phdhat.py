@@ -1,17 +1,20 @@
+from pathlib import Path
+import random
+import time
+
+import adafruit_ssd1306
 import board
 import busio
 from digitalio import DigitalInOut, Direction, Pull
-from PIL import ImageFont, ImageDraw, Image
-import adafruit_ssd1306
 import neopixel
-import time
 import numpy as np
-import random
+from PIL import ImageFont, ImageDraw, Image
+
 
 PI_PIN_NEOPIXELS = board.D18
-PI_PIN_AIRBRIDGE = board.D10 #"TODO"
+PI_PIN_AIRBRIDGE = board.D25
 PI_NEOPIXEL_COUNT = 18
-FONTPATH = "/home/ants/hat/src/surface_board_game/arial.ttf"
+FONTPATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 # Tick rate for sleeping between checking the buttons, 60 Hz
 FRAME_TIME = 1.0/60.0
 
@@ -191,12 +194,13 @@ class PhDHat:
         height = self.disp.height
         print(text)
         if new_screen:
-            self.image = Image.new("1", (width, height))
+            # Fill with black by default
+            self.image = Image.new("1", (width, height), color=0)
 
             # Get drawing object to draw on image.
             self.draw = ImageDraw.Draw(self.image)
             # Draw a black filled box to clear the image.
-            self.draw.rectangle((0, 0, width, height), outline=1, fill=1)
+            # self.draw.rectangle((0, 0, width, height), outline=1, fill=1)
 
         if font_size is not None:
             font = ImageFont.truetype(FONTPATH, font_size)
@@ -210,6 +214,7 @@ class PhDHat:
             text,
             font=font,
             anchor=anchor,
+            fill=1,  # white text
         )
 
         self.disp.image(self.image)
@@ -222,11 +227,11 @@ class PhDHat:
             self, score: int, n_rounds: int, streak: int,
             cycle: int,
     ) -> None:
-        text = f"Score: {score}/{n_rounds}      "\
+        text = f"Score: {score}/{n_rounds}   "\
                 f"Streak: {streak}"
         position=(2, 2)
         self._display_text_on_screen(text, new_screen=True,
-                                     font_size=10, position=position,
+                                     font_size=12, position=position,
                                      anchor='lt')
 
         self._display_text_on_screen(f'Cycle: {cycle}', new_screen=False)
@@ -250,7 +255,8 @@ class PhDHat:
     def airbridge_stage(self):
         # Display message
         self._display_text_on_screen(
-            "1. Finish fabricating\nthe airbridges"
+            "1. Finish\nfabricating\nthe airbridges",
+            sleep=3
         )
         while True:
             # If airbridge connection made (value brought low)
@@ -265,7 +271,7 @@ class PhDHat:
     def twpa_stage(self):
         # Display message
         self._display_text_on_screen(
-            "2. Tune the TWPA!", sleep=3,
+            "2. Tune\nthe TWPA", sleep=3,
         )
         # Optional: light up LEDs of data qubits in a dim way on readout line
         # with the twpa.
@@ -279,20 +285,28 @@ class PhDHat:
         success = False
         while not success:
 
-            text = (f"Pump power (U/D): {params['power']:.1f} dBm   "
-                    f"Pump frequency (L/R): {params['freq']:.2f} GHz")
-            gain, toomuchnoise = self.twpa_optimization(params['power'], params['freq'])
-            self._display_text_on_screen(text, anchor="lt", position=(2, 2), font_size=10)
+            text = (f"Pump parameters\n"
+                    f"Power (U/D): {params['power']:.1f} dBm\n"
+                    f"Freq.   (L/R): {params['freq']:.2f} GHz")
+            gain, toomuchnoise = self.twpa_optimization(
+                params['power'], params['freq'])
+            self._display_text_on_screen(
+                text, position=(64, 20), font_size=11)
             # multiplicative factor such that 20 dB at "optimal" twpa parameters i.e. 9 dbm and 7.91 GHz
             text = f"Gain: {gain * fact:.2f} dB"
-            self._display_text_on_screen(text, new_screen=False)
+            self._display_text_on_screen(
+                text,
+                position=(64, 50),
+                new_screen=False,
+            )
             mapping = [
                  (self.button_l, ('freq', -0.01), ),
                  (self.button_r, ('freq', 0.01), ),
                  (self.button_d, ('power', -0.1), ),
                  (self.button_u, ('power', 0.1),)
              ]
-            action = self.check_buttons(button_action_mapping=mapping, bypass_value=('power', 0.1))
+            action = self.check_buttons(
+                button_action_mapping=mapping, bypass_value=('power', 0.1))
             if isinstance(action, tuple):
                 params[action[0]] += action[1]
             if not toomuchnoise and np.abs(gain * fact - target_gain) < 0.5:
@@ -326,15 +340,17 @@ class PhDHat:
 
     def surface_code_stage(self):
         self._display_text_on_screen(
-            "Starting surface\nboard game..."
+            "3. Win\nthe surface\nboard game"
         )
         time.sleep(2)
 
         playing = True
-        print('Loading samples...')
+        
         # Assume your samples are loaded in the following format:
         # samples = {0: {'syndromes': [...], 'data_qubits': [...], 'log_op': ...}, 1: {...}, ...}
-        samples = self.load_samples("src/surface_board_game/samples.npz")
+        sample_path = Path(__file__).parent.joinpath("samples.npz")
+        print(f'Loading samples from {sample_path}')
+        samples = self.load_samples(sample_path)
         current_round = 1
         self.score = 0 # amount of successes
         self.streak = 0 # amount of consecutive successes
@@ -469,7 +485,7 @@ class PhDHat:
         if self.check_bypasses():
             return bypass_value
 
-    def check_bypasses(self, button_bypass=True, software_bypass=True):
+    def check_bypasses(self, button_bypass=True, software_bypass=False):
         if button_bypass and not self.button_a.value and not self.button_b.value:
             return True
         elif software_bypass and self.software_bypass:
@@ -501,15 +517,15 @@ class PhDHat:
         txt = f"Flip {op}_L?\n(Up: 'Yes', Down: 'No')"
         self._display_text_on_screen(txt, font_size=12)
 
-
-
     def display_success_screen(self, score, streak):
         text = f"Success!\n New Score: {score}, Streak: {streak}"
         self._display_text_on_screen(text, font_size=12)
+        self.light_neopixels(17*[True], 17*[(0, 255, 0)])  # green
         time.sleep(2)
 
     def display_failure_screen(self, score):
         text = f"Incorrect :-(\nScore: {score}"
         self._display_text_on_screen(text, font_size=12)
+        self.light_neopixels(17*[True], 17*[(255, 0, 0)])  # green
         time.sleep(2)
 
