@@ -470,6 +470,8 @@ class PhDHat:
         #                      keys=[f"d{i}" for i in range(1,  DISTANCE**2 +1) ]) # currently assumes data qubits are after aux.
         while playing:
             self._display_text_on_screen(f'Game #{current_round}', sleep=2)
+            self.light_neopixels([True] * DISTANCE**2, colors=[COLOR_DATA_QB] * DISTANCE**2,
+                                 keys=[f"d{i}" for i in range(1,  DISTANCE**2 +1) ])
             sample = self.choose_sample(samples)
             success = self.display_syndrome(sample)
 
@@ -543,7 +545,7 @@ class PhDHat:
 
     def display_syndrome(self, sample, colors=None, bypass_buttons=False):
         if colors is None:
-            colors = [COLOR_Z_AUX_QB] * 4 + [COLOR_X_AUX_QB] # * 4 + [COLOR_DATA_QB] * 9
+            colors = [COLOR_Z_AUX_QB] * 4 + [COLOR_X_AUX_QB] * 4 #+ [COLOR_DATA_QB] * 9
 
         cycle = 0
         exit = False
