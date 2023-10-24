@@ -110,9 +110,12 @@ blue_gradients = [
     (0, 0, 150), (0, 0, 160), (0, 0, 170), (0, 0, 180)
 ]
 red_gradients = [(255//3, 0//4, 0//4)]*64
-COLOR_Z_AUX_QB = green_gradients[10]
-COLOR_X_AUX_QB = blue_gradients[20]
-COLOR_DATA_QB = (255//3, 0//4, 0//4)
+# COLOR_Z_AUX_QB = green_gradients[10]
+# COLOR_X_AUX_QB = blue_gradients[20]
+# COLOR_DATA_QB = red_gradients[0]
+COLOR_Z_AUX_QB = (0, 128, 0)
+COLOR_X_AUX_QB = (0, 0, 128)
+COLOR_DATA_QB = (128, 0, 0)
 # Other global variables
 current_frame = 0
 
@@ -249,14 +252,21 @@ class PhDHat:
             self, score: int, n_rounds: int, streak: int,
             cycle: int,
     ) -> None:
-        text = f"Score: {score}/{n_rounds}   "\
-                f"Streak: {streak}"
-        position=(2, 2)
-        self._display_text_on_screen(text, new_screen=True,
-                                     font_size=12, position=position,
-                                     anchor='lt')
+        text = f"Score: {score}/{n_rounds}\nStreak: {streak}"
+        position=(64, 20)
+        self._display_text_on_screen(
+            text, new_screen=True,
+            font_size=12, position=position,
+        )
 
         self._display_text_on_screen(f'Cycle: {cycle}', new_screen=False)
+        self._display_text_on_screen(
+            'L/R to scroll',
+            new_screen=False,
+            anchor=("lb"),
+            font_size=12,
+            position=(2, 64-2)
+        )
         # time.sleep(2)
 
     def _led_test(self):
@@ -328,13 +338,15 @@ class PhDHat:
                 time.sleep(FRAME_TIME)
 
     def twpa_stage(self):
+        # Light all LEDs yellow to match the figure
+        for led_key in self.led_indices:
+            self.pixels[self.led_indices[led_key]] = (128, 128, 0)
         # Display message
         self._display_text_on_screen(
             "2. Tune\nthe TWPA", sleep=3,
         )
         # Optional: light up LEDs of data qubits in a dim way on readout line
         # with the twpa.
-        # ...
 
         # twpa optimization
         params = dict(power=8.5, freq=7.90)
@@ -343,7 +355,6 @@ class PhDHat:
         fact = 40/12.13
         success = False
         while not success:
-
             text = (f"Pump parameters\n"
                     f"Power (U/D): {params['power']:.1f} dBm\n"
                     f"Freq.   (L/R): {params['freq']:.2f} GHz")
@@ -563,6 +574,7 @@ class PhDHat:
         must be same length as mask and colors
         :return:
         """
+        # self.pixels.fill((0, 0, 0))
         if keys is not None:
             for k, m, c in zip(keys, mask, colors):
                 if m:
@@ -579,18 +591,18 @@ class PhDHat:
                     self.pixels[i] = (0, 0, 0)  # Turn off NeoPixel
 
     def display_logical_operator_prompt(self, op="Z"):
-        txt = f"Flip {op}_L?\n(Up: 'Yes', Down: 'No')"
+        txt = f"Flip {op}_L?\n(Up/Down: Yes/No)"
         self._display_text_on_screen(txt, font_size=12)
 
     def display_success_screen(self, score, streak):
-        text = f"Success!\n New Score: {score}, Streak: {streak}"
+        text = f"Success!\nNew Score: {score}\nStreak: {streak}"
         self._display_text_on_screen(text, font_size=12)
-        self.light_neopixels(17*[True], 17*[(0, 255, 0)])  # green
+        self.light_neopixels([False] + 17*[True], [(0, 0, 0)] + 17*[(0, 255, 0)])  # green
         time.sleep(2)
 
     def display_failure_screen(self, score):
         text = f"Incorrect :-(\nScore: {score}"
         self._display_text_on_screen(text, font_size=12)
-        self.light_neopixels(17*[True], 17*[(255, 0, 0)])  # green
+        self.light_neopixels([False] + 17*[True], [(0, 0, 0)] + 17*[(255, 0, 0)])  # red
         time.sleep(2)
 
