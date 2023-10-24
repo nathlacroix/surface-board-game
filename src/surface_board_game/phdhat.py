@@ -354,8 +354,8 @@ class PhDHat:
         # with the twpa.
 
         # twpa optimization
-        # params = dict(power=8.5, freq=7.90)  # easy ones
-        params = dict(power=8.0, freq=8.03)  # hard ones
+        params = dict(power=8.5, freq=7.90)  # easy ones
+        # params = dict(power=8.0, freq=8.03)  # hard ones
         target_gain = 20
         fact = 40/12.13
         success = False
@@ -461,8 +461,14 @@ class PhDHat:
 
         # light up data qubits
         self.pixels.fill((0, 0, 0))
-        self.light_neopixels([True] * DISTANCE**2, colors=[COLOR_DATA_QB] * DISTANCE**2,
-                             keys=[f"d{i}" for i in range(1,  DISTANCE**2 +1) ]) # currently assumes data qubits are after aux.
+        colors = [COLOR_Z_AUX_QB] * 4 + [COLOR_X_AUX_QB] * 4 + [COLOR_DATA_QB] * 9
+        keys = ["d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "z1", "z2", "z3", "z4", "x1", "x2", "x3", "x4"]
+        self.light_neopixels(
+            [True] * (DISTANCE**2 * 2 - 1), colors=colors,
+            keys=keys,
+        )
+        # self.light_neopixels([True] * DISTANCE**2, colors=[COLOR_DATA_QB] * DISTANCE**2,
+        #                      keys=[f"d{i}" for i in range(1,  DISTANCE**2 +1) ]) # currently assumes data qubits are after aux.
         while playing:
             self._display_text_on_screen(f'Game #{current_round}', sleep=2)
             sample = self.choose_sample(samples)
@@ -538,7 +544,7 @@ class PhDHat:
 
     def display_syndrome(self, sample, colors=None, bypass_buttons=False):
         if colors is None:
-            colors = [COLOR_Z_AUX_QB] * 4 + [COLOR_X_AUX_QB] * 4 + [COLOR_DATA_QB] * 9
+            colors = [COLOR_Z_AUX_QB] * 4 + [COLOR_X_AUX_QB] # * 4 + [COLOR_DATA_QB] * 9
 
         cycle = 0
         exit = False
@@ -564,7 +570,7 @@ class PhDHat:
                 print("Cycle:", cycle +1, syndrome_slice) # for display, cycles are 1-indexed
                 self._display_surface_board_cycle(score=self.score, n_rounds=self.n_rounds,
                                                   streak=self.streak, cycle=cycle+1) # for display, cycles are 1-indexed
-                self.light_neopixels(9*[True], colors[8:], keys=["d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9"])
+                # self.light_neopixels(9*[True], colors[8:], keys=["d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9"])
                 self.light_neopixels(syndrome_slice, colors, keys=["z1", "z2", "z3", "z4",
                                                                    "x1", "x2", "x3", "x4"])
 
