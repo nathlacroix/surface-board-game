@@ -13,7 +13,7 @@ from PIL import ImageFont, ImageDraw, Image
 
 PI_PIN_NEOPIXELS = board.D18
 PI_PIN_AIRBRIDGE = board.D25
-PI_NEOPIXEL_COUNT = 18
+PI_NEOPIXEL_COUNT = 21
 FONTPATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 # Tick rate for sleeping between checking the buttons, 60 Hz
 FRAME_TIME = 1.0/60.0
@@ -35,7 +35,6 @@ green_gradients = [
     (28, 227, 0),
     (32, 223, 0),
     (36, 219, 0),
-
     (44, 211, 0),
     (48, 207, 0),
     (52, 203, 0),
@@ -111,9 +110,12 @@ blue_gradients = [
     (0, 0, 150), (0, 0, 160), (0, 0, 170), (0, 0, 180)
 ]
 red_gradients = [(255//3, 0//4, 0//4)]*64
-COLOR_Z_AUX_QB = green_gradients[10]
-COLOR_X_AUX_QB = blue_gradients[20]
-COLOR_DATA_QB = (255//3, 0//4, 0//4)
+# COLOR_Z_AUX_QB = green_gradients[10]
+# COLOR_X_AUX_QB = blue_gradients[20]
+# COLOR_DATA_QB = red_gradients[0]
+COLOR_Z_AUX_QB = (0, 128, 0)
+COLOR_X_AUX_QB = (0, 0, 128)
+COLOR_DATA_QB = (128, 0, 0)
 # Other global variables
 current_frame = 0
 
@@ -121,15 +123,15 @@ class PhDHat:
 
     def __init__(self):
         # configure software bypass. Set to False to run in normal mode with the hat
-        self.software_bypass = True
+        self.software_bypass = False
 
         self.state = "pre-initialize"
         self.pixels = neopixel.NeoPixel(
             PI_PIN_NEOPIXELS,
             PI_NEOPIXEL_COUNT,
             brightness=0.2,
-            auto_write=False,
-            pixel_order=neopixel.GRB
+            # auto_write=False,
+            pixel_order=neopixel.GRB,
         )
         # Create the I2C interface.
         self.i2c = busio.I2C(board.SCL, board.SDA)
@@ -180,7 +182,30 @@ class PhDHat:
 
         # Clear the neopixels
         self.pixels.fill((0, 0, 0))
-        self.pixels.show()
+        # self.pixels.show()
+
+        self.led_indices = {
+            "d1":  1,
+            "d2":  5,
+            "d3":  7,
+            "d4":  3,
+            "d5":  9,
+            "d6": 15,
+            "d7": 11,
+            "d8": 13,
+            "d9": 17,
+            "x1":  6,
+            "x2":  4,
+            "x3": 14,
+            "x4": 12,
+            "z1": 2,
+            "z2": 10,
+            "z3":  8,
+            "z4": 16,
+            "twpa1": 18,
+            "twpa2": 19,
+            "twpa3": 20,
+        }
 
 
     def _display_text_on_screen(
@@ -227,22 +252,70 @@ class PhDHat:
             self, score: int, n_rounds: int, streak: int,
             cycle: int,
     ) -> None:
-        text = f"Score: {score}/{n_rounds}   "\
-                f"Streak: {streak}"
-        position=(2, 2)
-        self._display_text_on_screen(text, new_screen=True,
-                                     font_size=12, position=position,
-                                     anchor='lt')
+        text = f"Score: {score}/{n_rounds}\nStreak: {streak}"
+        position=(40, 18)
+        self._display_text_on_screen(
+            text, new_screen=True,
+            font_size=11, position=position,
+        )
 
-        self._display_text_on_screen(f'Cycle: {cycle}', new_screen=False)
+        self._display_text_on_screen(
+            f'Cycle: {cycle}', new_screen=False,
+            position=(64, 40)
+        )
+        self._display_text_on_screen(
+            'L/R to scroll',
+            new_screen=False,
+            anchor=("lb"),
+            font_size=11,
+            position=(2, 64-2)
+        )
         # time.sleep(2)
+
+    def _led_test(self):
+        self.pixels.fill((255, 0, 0))
+        # self.pixels.show()
+        time.sleep(2)
+        self.pixels.fill((0, 255, 0))
+        # self.pixels.show()
+        time.sleep(2)
+        self.pixels.fill((0, 0, 255))
+        # self.pixels.show()
+        time.sleep(2)
+        for led_key in self.led_indices:
+            self.pixels.fill((0, 0, 0))
+            if led_key[0] == 'd':
+                # red
+                color = (255, 0, 0)
+            elif led_key[0] == 'x':
+                # blue
+                color = (0, 0, 255)
+            elif led_key[0] == 'z':
+                # green
+                color = (0, 255, 0)
+            else:
+                color = (128, 128, 128)
+            # for pix_idx in range(len(self.pixels)):
+            #     self.pixels[pix_idx] = (0, 0, 0)
+            print(f"LED {led_key}, index {self.led_indices[led_key]}")
+            self.pixels[self.led_indices[led_key]] = color
+            # self.pixels.show()
+            # mask = PI_NEOPIXEL_COUNT * [False]
+            # colors = PI_NEOPIXEL_COUNT * [(0, 0, 0)]
+            # mask[self.led_indices[led_key]] = True
+            # colors[self.led_indices[led_key]] = color
+            # self.light_neopixels(mask, colors)
+            time.sleep(3)
 
     def initial_stage(self):
         print('Initial stage ...')
         # Display welcome text
         self._display_text_on_screen(
-            "Welcome\nto your PhD hat\nPress #5 to start"
+            "Welcome\nto your PhD hat\nPress #5 to start",
+            sleep=1,
         )
+        self.pixels.fill((0, 0, 0))
+        # self._led_test()
         while True:
             # If A button pressed (value brought low)
             if not self.button_a.value:
@@ -258,6 +331,7 @@ class PhDHat:
             "1. Finish\nfabricating\nthe airbridges",
             sleep=3
         )
+        self.pixels.fill((0, 0, 0))
         while True:
             # If airbridge connection made (value brought low)
             if not self.airbridge_input.value:
@@ -269,27 +343,36 @@ class PhDHat:
                 time.sleep(FRAME_TIME)
 
     def twpa_stage(self):
+        # Light all LEDs yellow to match the figure
+        for led_key in self.led_indices:
+            self.pixels[self.led_indices[led_key]] = (128, 128, 0)
         # Display message
         self._display_text_on_screen(
             "2. Tune\nthe TWPA", sleep=3,
         )
         # Optional: light up LEDs of data qubits in a dim way on readout line
         # with the twpa.
-        # ...
 
         # twpa optimization
-        params = dict(power=8.5, freq=7.90) # t
-        # params = dict(power=8.0, freq=8.03) # init params for Ants
+        # params = dict(power=8.5, freq=7.90)  # easy ones
+        params = dict(power=8.0, freq=8.03)  # hard ones
         target_gain = 20
         fact = 40/12.13
         success = False
         while not success:
-
             text = (f"Pump parameters\n"
                     f"Power (U/D): {params['power']:.1f} dBm\n"
                     f"Freq.   (L/R): {params['freq']:.2f} GHz")
             gain, toomuchnoise = self.twpa_optimization(
                 params['power'], params['freq'])
+            self.pixels.fill((0, 0, 0))
+            if not toomuchnoise:
+                color = (int(15*gain), int(15*gain), 0)
+                self.pixels.fill(color)
+            else:
+                for i in range(len(self.pixels)):
+                    color = [random.randrange(255) for i in range(3)]
+                    self.pixels[i] = color
             self._display_text_on_screen(
                 text, position=(64, 20), font_size=11)
             # multiplicative factor such that 20 dB at "optimal" twpa parameters i.e. 9 dbm and 7.91 GHz
@@ -338,12 +421,30 @@ class PhDHat:
             toomuchnoise = False
         return gain, toomuchnoise
 
+    def play_again(self):
+        print('Play again?')
+        # Display welcome text
+        self._display_text_on_screen(
+            "Play again?\nPress #5 to start",
+            sleep=1,
+        )
+        self.pixels.fill((0, 0, 0))
+        # self._led_test()
+        while True:
+            # If A button pressed (value brought low)
+            if not self.button_a.value:
+                N_DETERMINISTIC_SAMPLES = 0
+                return True
+            elif self.check_bypasses():
+                N_DETERMINISTIC_SAMPLES = 0
+                return True
+            else:
+                time.sleep(FRAME_TIME)
+
     def surface_code_stage(self):
         self._display_text_on_screen(
             "3. Win\nthe surface\nboard game"
         )
-        time.sleep(2)
-
         playing = True
         
         # Assume your samples are loaded in the following format:
@@ -357,10 +458,20 @@ class PhDHat:
         self.n_rounds = 3 # number of games of decoding to program
 
         # light up data qubits
-        self.light_neopixels([True] * DISTANCE**2, colors=[COLOR_DATA_QB] * DISTANCE**2,
-                             indices=np.arange(DISTANCE**2) + N_AUX_QBS) # currently assumes data qubits are after aux.
+        self.pixels.fill((0, 0, 0))
+        colors = [COLOR_DATA_QB] * 9 + [COLOR_Z_AUX_QB] * 4 + [COLOR_X_AUX_QB] * 4 
+        keys = ["d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "z1", "z2", "z3", "z4", "x1", "x2", "x3", "x4"]
+        self.light_neopixels(
+            [True] * (DISTANCE**2 * 2 - 1), colors=colors,
+            keys=keys,
+        )
+        time.sleep(2)
+        # self.light_neopixels([True] * DISTANCE**2, colors=[COLOR_DATA_QB] * DISTANCE**2,
+        #                      keys=[f"d{i}" for i in range(1,  DISTANCE**2 +1) ]) # currently assumes data qubits are after aux.
         while playing:
             self._display_text_on_screen(f'Game #{current_round}', sleep=2)
+            self.light_neopixels([True] * DISTANCE**2, colors=[COLOR_DATA_QB] * DISTANCE**2,
+                                 keys=[f"d{i}" for i in range(1,  DISTANCE**2 +1) ])
             sample = self.choose_sample(samples)
             success = self.display_syndrome(sample)
 
@@ -377,16 +488,20 @@ class PhDHat:
                 playing = False
 
         if self.score/self.n_rounds > 0.5:
-            text = (f"Congratulations!\nYou are {self.score/self.n_rounds*100:.1f}% "
-                    f"successful at decoding!\nThis is "
-                    f"enough to correctly\nproject onto the Massachusetts\n State "
+            text = (f"Congratulations!\nDecoding\nSuccess Prob. {self.score/self.n_rounds*100:.1f}%")
+            self._display_text_on_screen(text, font_size=11, sleep=3)
+            text = (f"This is enough to\n"
+                    f"correctly project onto\n"
+                    f"the Massachusetts State\n"
                     f"without errors.")
-            self._display_text_on_screen(text, font_size=10)
+            self._display_text_on_screen(text, font_size=10, sleep=10)
         else:
-            text = (f"You are {self.score / self.n_rounds*100:.1f}% "
-                   f"successful at decoding.\nMake sure to train again before "
-                   f"\nprojecting onto the Massachusetts\n State.")
-            self._display_text_on_screen(text, font_size=10)
+            text = (f"Decoding\nSuccess Prob. {self.score / self.n_rounds*100:.1f}%")
+            self._display_text_on_screen(text, font_size=10, sleep=2)
+            text = (f"Make sure to train\n"
+                    f"again before projecting\n"
+                    f"onto the Massachusetts\nState.")
+            self._display_text_on_screen(text, font_size=10, sleep=10)
         print('Game over.')
 
     def check_logical_operator(self, sample, flip):
@@ -430,7 +545,7 @@ class PhDHat:
 
     def display_syndrome(self, sample, colors=None, bypass_buttons=False):
         if colors is None:
-            colors = [COLOR_Z_AUX_QB] * 4 + [COLOR_X_AUX_QB] * 4
+            colors = [COLOR_Z_AUX_QB] * 4 + [COLOR_X_AUX_QB] * 4 #+ [COLOR_DATA_QB] * 9
 
         cycle = 0
         exit = False
@@ -456,7 +571,9 @@ class PhDHat:
                 print("Cycle:", cycle +1, syndrome_slice) # for display, cycles are 1-indexed
                 self._display_surface_board_cycle(score=self.score, n_rounds=self.n_rounds,
                                                   streak=self.streak, cycle=cycle+1) # for display, cycles are 1-indexed
-                self.light_neopixels(syndrome_slice, colors)
+                # self.light_neopixels(9*[True], colors[8:], keys=["d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9"])
+                self.light_neopixels(syndrome_slice, colors, keys=["z1", "z2", "z3", "z4",
+                                                                   "x1", "x2", "x3", "x4"])
 
                 if bypass_buttons:
                     cycle += 1
@@ -495,37 +612,43 @@ class PhDHat:
         else:
             return False
 
-    def light_neopixels(self, mask, colors, indices=None):
+    def light_neopixels(self, mask, colors, indices=None, keys=None):
         """
-
         :param mask: list of booleans, if True, turn on pixel, if False, turn off
         :param colors: colors for each pixel. must be same length as mask
         :param indices: optional list of indices in the self.pixels list addressed by mask.
         must be same length as mask and colors
         :return:
         """
-        if indices is None:
-            indices = np.arange(len(mask))
-        for i, m, c in zip(indices, mask, colors):
-            if m:
-                self.pixels[i] = c  # Turn on NeoPixel
-            else:
-                self.pixels[i] = (0, 0, 0)  # Turn off NeoPixel
-        self.pixels.show()
+        # self.pixels.fill((0, 0, 0))
+        if keys is not None:
+            for k, m, c in zip(keys, mask, colors):
+                if m:
+                    self.pixels[self.led_indices[k]] = c  # Turn on NeoPixel
+                else:
+                    self.pixels[self.led_indices[k]] = (0, 0, 0)  # Turn off NeoPixel
+        else:
+            if indices is None:
+                indices = np.arange(len(mask))
+            for i, m, c in zip(indices, mask, colors):
+                if m:
+                    self.pixels[i] = c  # Turn on NeoPixel
+                else:
+                    self.pixels[i] = (0, 0, 0)  # Turn off NeoPixel
 
     def display_logical_operator_prompt(self, op="Z"):
-        txt = f"Flip {op}_L?\n(Up: 'Yes', Down: 'No')"
+        txt = f"Flip {op}_L?\n(Up/Down: Yes/No)"
         self._display_text_on_screen(txt, font_size=12)
 
     def display_success_screen(self, score, streak):
-        text = f"Success!\n New Score: {score}, Streak: {streak}"
+        text = f"Success!\nNew Score: {score}\nStreak: {streak}"
         self._display_text_on_screen(text, font_size=12)
-        self.light_neopixels(17*[True], 17*[(0, 255, 0)])  # green
+        self.light_neopixels([False] + 17*[True], [(0, 0, 0)] + 17*[(0, 255, 0)])  # green
         time.sleep(2)
 
     def display_failure_screen(self, score):
         text = f"Incorrect :-(\nScore: {score}"
         self._display_text_on_screen(text, font_size=12)
-        self.light_neopixels(17*[True], 17*[(255, 0, 0)])  # green
+        self.light_neopixels([False] + 17*[True], [(0, 0, 0)] + 17*[(255, 0, 0)])  # red
         time.sleep(2)
 
